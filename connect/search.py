@@ -1,69 +1,61 @@
-from typing import Any, AnyStr, Optional
+from typing import Dict, List
 import logging
-import pandas as pd
 
-from .base import Connect
+from .base import Connector
 
 logger = logging.getLogger('companies_house api')
 
-class Search(Connect):
+def create_http_request_string(search_term,
+                                **kwargs) -> str:
     """
-    Class used to communicate requests with Connect
+    Create http request string for url
     """
-    def __init__(self,
-                 api_key: AnyStr):
-        super().__init__(api_key)
+    http_request = search_term
+    for key, val in kwargs.items():
+        http_request += f'&{key}={val}'
+    return http_request
 
-        self.response_json: Any = ''
-        self.response_df: pd.DataFrame = self.update_df()
 
-    @staticmethod
-    def _create_http_request_string(search_term,
-                                    **kwargs) -> AnyStr:
-        """
-        Create http request string for url
-        """
-        http_request = search_term
-        for key, val in kwargs.items():
-            http_request += f'&{key}={val}'
-        return http_request
+class Search:
+    """
+    Runs Connector class passing in http request strings
+    """
+    def __init__(self, connect: Connector):
 
-    def update_df(self, update_dict: Optional[dict]=None) -> pd.DataFrame:
-        """
-        Updates dataframe with dictionary and creates it if not exists
-        """
-        if hasattr(self, 'response_df'):
-            return self.response_df.append(update_dict, ignore_index=True)
-        return pd.DataFrame()
+        self.con: Connector = connect
+        self.response_json: Dict = {}
 
     def _search_companies(self,
-                          search_term,
-                          **kwargs) -> dict:
+                          search_term: str,
+                          **kwargs) -> List[dict]:
         """
         Searches single page and returns as json
         """
-        self.response_json = self.exec(
-            self._create_http_request_string(search_term, **kwargs)
+        self.response_json = self.con.run(
+            create_http_request_string(search_term, **kwargs)
         )
         return self.response_json
 
     def search_companies(self,
-                         search_term,
-                         items_per_page=100,
-                         start_page=0,
-                         page_limit=999) -> pd.DataFrame:
+                         search_term: str,
+                         search_string: str='search/companies?q=',
+                         items_per_page: int=100,
+                         start_page: int=0,
+                         page_limit: int=999) -> List:
         """
         Loops through max number of pages for all results
         """
+        response = []
         for page in range(start_page, page_limit):
+            print(page)
             logger.debug(f'Page number: {page}')
 
             resp = self._search_companies(
-                search_term,
+                search_string + search_term,
                 items_per_page=items_per_page,
                 start_index=page
             )
-            self.response_df = self.update_df(resp['items'])
+            response.extend(resp['items'])
             num_items = len(resp['items'])
             no_items = num_items==0
             logger.debug(f'Number of companies in page: {num_items}')
@@ -71,4 +63,4 @@ class Search(Connect):
                 break
             if page == page_limit and not num_items:
                 logger.warning('Last page reached. Likely more results available')
-        return self.response_df
+        return response

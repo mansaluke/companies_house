@@ -1,6 +1,6 @@
 import logging
 import pandas as pd
-from connect import Search
+from connect import Search, Connect
 from secret import API_KEY
 from const import csv_path
 
@@ -11,9 +11,11 @@ log.setLevel(logging.INFO)
 
 # Download data
 log.info('Initiate search class')
-s = Search(API_KEY)
-log.info('Search companies')
-search_results_df = s.search_companies('amius')  # page_limit=2)
+s = Search(Connect(API_KEY))
+log.info('Searching companies')
+search_results_df = pd.DataFrame(
+    s.search_companies('tesco')  # page_limit=2)
+  )
 
 # View results
 print(search_results_df.head())
